@@ -1,0 +1,55 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4022.18">
+  <POU Name="MAIN" Id="{6e00714c-772f-416c-ba17-6c8aa59a17a4}" SpecialFunc="None">
+    <Declaration><![CDATA[PROGRAM MAIN
+VAR CONSTANT
+    TestSize : INT := 5000;
+END_VAR
+VAR
+    {attribute 'pytmc' := '
+        pv: TestArray
+     '}
+    TestArray : ARRAY [0..TestSize] OF TestStruct;
+    NoiseRand : DRAND := (Seed:=0);
+    idx : INT;
+    firstpass : BOOL := TRUE;
+    {attribute 'pytmc' := '
+        pv: LastExecTime
+        io: i
+     '}
+    LastExecTime : UDINT;
+    CycleTime : UDINT;
+    fbGetCurTaskIdx  : GETCURTASKINDEX;
+    
+    fbRTM : FB_RTMon_LogMark;
+    
+    fbRouterStatus : FB_GetRouterStatusInfo;
+    RouterInfo : ST_TcRouterStatusInfo;
+END_VAR
+]]></Declaration>
+    <Implementation>
+      <ST><![CDATA[fbRTM.LogIntervalStart(1,1);
+
+fbRTM.LogSequenceStart(1,2);
+For idx := 0 to TestSize DO
+    NoiseRand();
+    TestArray[idx].Number := NoiseRand.Num;
+    TestArray[idx].Bin := NoiseRand.Num > 0.5;
+END_FOR
+fbRTM.LogSequenceStop(1,2);
+
+IF firstpass THEN 
+    fbGetCurTaskIdx();
+    firstpass := false;
+END_IF
+LastExecTime := _TaskInfo[fbGetCurTaskIdx.index].LastExecTime;
+
+fbRTM.LogIntervalStop(1,1);
+
+fbRouterStatus.bExecute S= NOT fbRouterStatus.bBusy;
+fbRouterStatus.bExecute R= fbRouterStatus.bBusy;
+fbRouterStatus();
+IF NOT fbRouterStatus.bBusy THEN RouterInfo := fbRouterStatus.info; END_IF]]></ST>
+    </Implementation>
+  </POU>
+</TcPlcObject>
